@@ -36,25 +36,32 @@ def packet_definition_health_check(packet_definition):
             if PACKET_VALIDATION_SCHEME in packet_definition:
                 # The packet should have a valid validation scheme
                 if packet_definition[PACKET_VALIDATION_SCHEME] in PACKET_VALIDATION_SCHEMES:
-                    # Packet should have its values in a dict format
+                    # Packet should have its values
                     if VALUES in packet_definition:
                         values = packet_definition[VALUES]
-                        # Values can only be in list or dict format
-                        for v in values:
-                            if (type(v) != list) and (type(v) != dict):
-                                print("packet_definition is:")
-                                print(packet_definition)
-                                print("The value of a index must be a list or another packet") 
-                                return False
-                            # Sub packet must also be valid
-                            if (type(v) == dict):
-                                if (packet_definition_health_check(v) == False):
+                        # Packet should have its values in a dict format
+                        if type(values) == dict:
+                            # Values are of the form { index : mapping }
+                            # Where index corresponds to the packets index placement and the value is the potential value of that index
+                            for v in values:
+                                if (type(values[v]) != list) and (type(values[v]) != dict):
                                     print("packet_definition is:")
                                     print(packet_definition)
-                                    print("Sub packets must also be valid") 
+                                    print("Each index must have list or dict value")
                                     return False
-                        return True
-                                
+                                # Sub packet must also be valid
+                                if (type(values[v]) == dict):
+                                    if (packet_definition_health_check(values[v]) == False):
+                                        print("packet_definition is:")
+                                        print(packet_definition)
+                                        print("Sub packets must also be valid")
+                                        return False
+                            return True
+                        else:
+                            print("packet_definition is:")
+                            print(packet_definition)
+                            print("packet_definition must contain Values are of the form { index : mapping }")
+                            return False
                     else:
                         print("packet_definition is:")
                         print(packet_definition)
@@ -166,7 +173,7 @@ def load_all_packet_definitions():
         if file_writter.get_file_extension(af) == ".json":
             loaded_packet = load_packet_definition(af)
             if loaded_packet != None:
-                packets_definitions.append(load_packet_definition(loaded_packet))
+                packets_definitions.append(loaded_packet)
     
     return packets_definitions
  
