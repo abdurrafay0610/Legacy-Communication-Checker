@@ -27,8 +27,8 @@ while (True):
         
         for ps in range(packet_size):
             print("For packet index: " + str(ps))
-            print("1: If you want to add a list of values to the packet, press 2")
-            print("2: If you want to add another packet here press 3")
+            print("1: If you want to add a list of values to the packet, press 1")
+            print("2: If you want to add another packet here press 2")
             
             choice2 = int(input("Enter a Choice: "))
             print("")
@@ -59,6 +59,9 @@ while (True):
         counter_choice = int(input("Choose which packet to add here: "))
         selected_packet_definition = available_packets[counter_choice]
         created_packet = packet.create_packet(selected_packet_definition)
+    elif choice == 3:
+        print("Exit")
+        break
         
         
     

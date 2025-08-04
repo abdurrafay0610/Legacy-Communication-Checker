@@ -15,7 +15,7 @@ import packet_authentication_functions
 PACKET_NAME = "Packet Name"
 VALUES = "values"
 PACKET_VALIDATION_SCHEME = "Packet Validation Scheme"
-JSON_FILE_DIRECTORY = "../Sir Hamza packet sender/Packets Definition"
+JSON_FILE_DIRECTORY = "./Packets Definition"
 PACKET_VALIDATION_SCHEMES = ["CHECKSUM", "REVS_CHECKSUM", "CRC16_LSB_MSB", "CRC16_MSB_LSB"]
 def setup():
     pass
