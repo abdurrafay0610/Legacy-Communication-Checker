@@ -151,6 +151,8 @@ def load_packet_definition(file_path):
     if (packet_definition_health_check(loaded_packet)):
         return loaded_packet
     else:
+        print("Failed packet definition health check:")
+        print(loaded_packet)
         return None
 
 def load_all_packet_definitions():
@@ -194,7 +196,9 @@ def create_packet(packet_definition):
     # CheckSum
     if packet_definition[PACKET_VALIDATION_SCHEME] == PACKET_VALIDATION_SCHEMES[0]:
         packet_authentication_functions.add_checksum(packet)
-    
+
+    assert packet_definition_health_check(packet), "Packet failed definition health check"
+
     return packet
  
 def get_packet_values(packet):
@@ -219,21 +223,6 @@ def get_packet_values(packet):
             result_list.append(packet_values[i])
     
     return result_list
-
-"""    
-packet = define_packet("test",[1,2,3,[1,2,3]])
-save_packet_definition(packet)
-print(get_packet_values(packet))
-print("")
-loaded_packet = load_packet_definition(JSON_FILE_DIRECTORY + "/test.json")
-print(loaded_packet)
-print("")
-print(file_writter.get_all_files("./static"))
-print("")
-print(file_writter.get_all_files(JSON_FILE_DIRECTORY))
-print("")
-print(load_all_packet_definitions())
-""" 
 
     
         
