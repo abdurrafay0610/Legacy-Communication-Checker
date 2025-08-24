@@ -190,7 +190,7 @@ def create_packet(packet_definition):
     packet = []
     value_dict = packet_definition[VALUES]
     
-    for i in range(len(value_dict)):
+    for i in value_dict:
         if type(value_dict[i]) == list:
             packet.append(value_dict[i][random.randint(0, len(value_dict[i])-1)])
         elif type(value_dict[i]) == dict:
@@ -201,7 +201,6 @@ def create_packet(packet_definition):
     # CheckSum
     if packet_definition[PACKET_VALIDATION_SCHEME] == PACKET_VALIDATION_SCHEMES[0]:
         packet_authentication_functions.add_checksum(packet)
-
 
     return packet
  

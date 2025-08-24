@@ -59,6 +59,7 @@ while (True):
         counter_choice = int(input("Choose which packet to add here: "))
         selected_packet_definition = available_packets[counter_choice]
         created_packet = packet.create_packet(selected_packet_definition)
+        print(created_packet)
     elif choice == 3:
         print("Exit")
         break
