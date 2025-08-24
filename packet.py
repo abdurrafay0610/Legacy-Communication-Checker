@@ -185,7 +185,7 @@ def create_packet(packet_definition):
     Function Description: This function will create a packet for us, using the 
     packet definition provided as a parameter. 
     """
-    assert type(packet_definition) is dict, "packet definition must be a dictionary!"
+    assert packet_definition_health_check(packet_definition), "Packet failed definition health check"
     
     packet = []
     value_dict = packet_definition[VALUES]
@@ -202,7 +202,6 @@ def create_packet(packet_definition):
     if packet_definition[PACKET_VALIDATION_SCHEME] == PACKET_VALIDATION_SCHEMES[0]:
         packet_authentication_functions.add_checksum(packet)
 
-    assert packet_definition_health_check(packet), "Packet failed definition health check"
 
     return packet
  
