@@ -13,7 +13,7 @@ except Exception:
 DATA_DIR = Path(os.environ.get("PACKET_SENDER_DATA_DIR","data"))
 DEFS_PATH = DATA_DIR / "packets.json"
 
-PACKET_VALIDATION_SCHEMES = getattr(packet, "PACKET_VALIDATION_SCHEMES", ["NONE","CHECKSUM","CRC16"])
+PACKET_VALIDATION_SCHEMES = getattr(packet, "PACKET_VALIDATION_SCHEMES", ["NONE","CHECKSUM","CRC16", "CRC32"])
 PACKET_NAME_KEY = getattr(packet, "PACKET_NAME", "name")
 
 def read_defs() -> List[Dict[str, Any]]:
