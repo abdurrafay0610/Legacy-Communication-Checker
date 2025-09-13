@@ -1,0 +1,177 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Packet Sender — Define</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Define Packet</h1>
+    <nav>
+      <a href="{{ url_for('define_page') }}">Define</a>
+      <a href="{{ url_for('send_page') }}">Send</a>
+    </nav>
+  </header>
+
+  <section class="card">
+    <h2>Packet Details</h2>
+    <div class="grid grid-2">
+      <label>
+        Packet Name
+        <input id="packet_name" placeholder="MyPacket">
+      </label>
+      <label>
+        Packet Size (number of indices)
+        <input id="packet_size" type="number" min="1" value="1">
+      </label>
+      <label class="col-span-2">
+        Validation Scheme
+        <select id="validation_scheme">
+          {% for s in validation_schemes %}
+            <option value="{{ s }}">{{ s }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Indices</h2>
+    <div id="indices"></div>
+  </section>
+
+  <section class="card">
+    <button id="previewBtn">Preview</button>
+    <button id="saveBtn">Save</button>
+    <pre id="preview" class="result"></pre>
+  </section>
+
+  <section class="card">
+    <h2>Available Packets (for nesting)</h2>
+    <div class="list">
+      {% for p in packets %}
+        <div class="row">
+          <div><strong>{{ p[pkt_name_key] }}</strong></div>
+        </div>
+      {% else %}
+        <div class="muted">No saved packets yet.</div>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+<script>
+const PACKETS = {{ packets|tojson }};
+const NAME_KEY = {{ pkt_name_key|tojson }};
+
+function packetOptions(){
+  return PACKETS.map(p => `<option value="${p[NAME_KEY]}">${p[NAME_KEY]}</option>`).join("");
+}
+function buildIndexRow(i){
+  return `
+    <div class="index-block">
+      <h3>Index ${i}</h3>
+      <label>
+        Choose Content
+        <select data-kind="${i}" class="kind">
+          <option value="bytes">List of Bytes</option>
+          <option value="packet_ref">Another Packet</option>
+        </select>
+      </label>
+      <div class="bytes" data-bytes="${i}">
+        <label>
+          How many values?
+          <input type="number" min="1" value="1" data-count="${i}">
+        </label>
+        <div class="byte-list" data-list="${i}"></div>
+      </div>
+      <div class="packet-ref" data-ref="${i}" style="display:none">
+        <label>
+          Choose Packet to insert
+          <select data-refname="${i}">
+            <option value="">-- choose --</option>
+            ${packetOptions()}
+          </select>
+        </label>
+      </div>
+    </div>
+  `;
+}
+function renderByteInputs(i, count){
+  const wrap = document.querySelector(`[data-list="${i}"]`);
+  wrap.innerHTML = "";
+  for(let k=0;k<count;k++){
+    const inp = document.createElement("input");
+    inp.type="number"; inp.min=0; inp.max=255; inp.value=0; inp.setAttribute("data-byte", `${i}:${k}`);
+    wrap.appendChild(inp);
+  }
+}
+function rebuildIndices(){
+  const size = parseInt(document.getElementById("packet_size").value, 10) || 1;
+  const indices = document.getElementById("indices");
+  indices.innerHTML = "";
+  for(let i=0;i<size;i++){
+    indices.insertAdjacentHTML("beforeend", buildIndexRow(i));
+    renderByteInputs(i, 1);
+  }
+}
+document.getElementById("packet_size").addEventListener("input", rebuildIndices);
+document.addEventListener("change", (e)=>{
+  const t = e.target;
+  if(t.matches(".kind")){
+    const i = t.getAttribute("data-kind");
+    const isBytes = t.value === "bytes";
+    document.querySelector(`[data-bytes="${i}"]`).style.display = isBytes? "block":"none";
+    document.querySelector(`[data-ref="${i}"]`).style.display = isBytes? "none":"block";
+  }else if(t.hasAttribute("data-count")){
+    const i = t.getAttribute("data-count");
+    const count = parseInt(t.value||"1",10);
+    renderByteInputs(i, Math.max(1, count));
+  }
+});
+function collectDefinition(){
+  const packet_name = document.getElementById("packet_name").value.trim();
+  const packet_size = parseInt(document.getElementById("packet_size").value, 10) || 1;
+  const validation_scheme = document.getElementById("validation_scheme").value;
+  const values = {};
+  for(let i=0;i<packet_size;i++){
+    const kind = document.querySelector(`[data-kind="${i}"]`).value;
+    if(kind === "bytes"){
+      const inputs = document.querySelectorAll(`[data-byte^="${i}:"]`);
+      const arr = [];
+      inputs.forEach(inp => {
+        let v = parseInt(inp.value||"0",10);
+        if(isNaN(v)) v = 0;
+        v = Math.max(0, Math.min(255, v));
+        arr.push(v);
+      });
+      values[i] = {kind:"bytes", values: arr};
+    }else{
+      const refname = document.querySelector(`[data-refname="${i}"]`).value;
+      values[i] = {kind:"packet_ref", name: refname};
+    }
+  }
+  return { packet_name, packet_size, validation_scheme, values };
+}
+async function preview(){
+  const body = collectDefinition();
+  const res = await fetch("/api/define/preview",{method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
+  const data = await res.json();
+  if(!res.ok){ throw new Error(data.error||"preview failed"); }
+  document.getElementById("preview").textContent = JSON.stringify(data, null, 2);
+  return data;
+}
+async function save(){
+  const pr = await preview();
+  const res = await fetch("/api/define/save",{method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({definition: pr.definition})});
+  const data = await res.json();
+  if(!res.ok){ throw new Error(data.error||"save failed"); }
+  alert("Saved!");
+  location.reload();
+}
+document.getElementById("previewBtn").addEventListener("click", ()=>preview().catch(e=>alert(e.message)));
+document.getElementById("saveBtn").addEventListener("click", ()=>save().catch(e=>alert(e.message)));
+rebuildIndices();
+</script>

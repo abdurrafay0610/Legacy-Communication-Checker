@@ -1,0 +1,23 @@
+{
+    "Packet Name": "abc",
+    "Packet Validation Scheme": "CHECKSUM",
+    "values": {
+        "0": [
+            55
+        ],
+        "1": [
+            55
+        ],
+        "2": [
+            0,
+            255
+        ],
+        "3": [
+            0,
+            1
+        ],
+        "4": [
+            0
+        ]
+    }
+}

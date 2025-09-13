@@ -1,0 +1,100 @@
+
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Packet Sender — Define</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Packet Definitions</h1>
+      <nav>
+        <a href="{{ url_for('define_page') }}">Define</a>
+        <a href="{{ url_for('send_page') }}">Send</a>
+      </nav>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-wrap">
+          {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <section class="card">
+      <h2>Create / Save a Packet</h2>
+      <form method="post" action="{{ url_for('define_create') }}" class="grid grid-2">
+        <label>
+          Name
+          <input name="name" placeholder="HeartbeatUDP" required>
+        </label>
+        <label>
+          Protocol
+          <select name="protocol">
+            <option>UDP</option>
+            <option>TCP</option>
+          </select>
+        </label>
+        <label class="col-span-2">
+          Destination Host (or IP)
+          <input name="destination" placeholder="127.0.0.1">
+        </label>
+        <label>
+          Port
+          <input name="port" type="number" min="0" max="65535" placeholder="9000">
+        </label>
+        <label>
+          Timeout (ms)
+          <input name="timeout_ms" type="number" min="0" value="2000">
+        </label>
+        <label>
+          Retries
+          <input name="retries" type="number" min="0" value="0">
+        </label>
+
+        <label class="col-span-2">
+          Payload
+          <textarea name="payload" rows="3" placeholder="hello world"></textarea>
+        </label>
+
+        <label class="col-span-2">
+          Headers (JSON)
+          <textarea name="headers" rows="3" placeholder='{"X-App":"PacketSender"}'></textarea>
+        </label>
+
+        <label class="col-span-2">
+          Auth (JSON)
+          <textarea name="auth" rows="3" placeholder='{"user":"alice"}'></textarea>
+        </label>
+
+        <div class="col-span-2 right">
+          <button type="submit">Save Definition</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Saved Packets</h2>
+      <div class="list">
+        {% for p in packets %}
+          <div class="row">
+            <div><strong>{{ p.name }}</strong> — {{ p.protocol }} {{ p.destination }}:{{ p.port }}</div>
+            <form method="post" action="{{ url_for('define_delete') }}">
+              <input type="hidden" name="name" value="{{ p.name }}">
+              <button type="submit" class="danger">Delete</button>
+            </form>
+          </div>
+        {% else %}
+          <div class="muted">No saved packets yet.</div>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+</body>
+</html>

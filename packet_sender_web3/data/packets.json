@@ -1,0 +1,55 @@
+[
+  {
+    "name": "Test",
+    "size": 5,
+    "validation_scheme": "CRC16",
+    "values": {
+      "0": [
+        255
+      ],
+      "1": [
+        255,
+        255
+      ],
+      "2": [
+        255
+      ],
+      "3": [
+        255
+      ],
+      "4": [
+        0
+      ]
+    }
+  },
+  {
+    "name": "Test 2",
+    "size": 1,
+    "validation_scheme": "CHECKSUM",
+    "values": {
+      "0": {
+        "name": "Test",
+        "size": 5,
+        "validation_scheme": "CRC16",
+        "values": {
+          "0": [
+            255
+          ],
+          "1": [
+            255,
+            255
+          ],
+          "2": [
+            255
+          ],
+          "3": [
+            255
+          ],
+          "4": [
+            0
+          ]
+        }
+      }
+    }
+  }
+]

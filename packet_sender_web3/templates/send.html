@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Packet Sender — Send</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Send Packet</h1>
+    <nav>
+      <a href="{{ url_for('define_page') }}">Define</a>
+      <a href="{{ url_for('send_page') }}">Send</a>
+    </nav>
+  </header>
+
+  <section class="card">
+    <h2>1) Choose Packet</h2>
+    <label>Packet
+      <select id="packet_name">
+        <option value="">-- choose --</option>
+        {% for p in packets %}
+          <option value="{{ p[pkt_name_key] }}">{{ p[pkt_name_key] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </section>
+
+  <section class="card">
+    <h2>2) Choose Sending Scheme</h2>
+    <label>Scheme
+      <select id="scheme">
+        <option>UDP</option>
+        <option>TCP</option>
+        <option>Serial</option>
+      </select>
+    </label>
+  </section>
+
+  <section class="card" id="paramsCard">
+    <h2>3) Parameters</h2>
+    <div id="params"></div>
+  </section>
+
+  <section class="card">
+    <button id="sendBtn">Send</button>
+    <pre id="result" class="result"></pre>
+  </section>
+</div>
+
+<script>
+function schemeParamsUI(s){
+  if(s==="UDP"||s==="TCP"){
+    return `
+      <div class="grid grid-2">
+        <label>Host <input id="host" placeholder="127.0.0.1"></label>
+        <label>Port <input id="port" type="number" min="1" max="65535" value="9000"></label>
+        ${s==="TCP" ? '<label>Timeout (s) <input id="timeout" type="number" min="0" step="0.1" value="2.0"></label>' : ''}
+      </div>
+    `;
+  }
+  if(s==="Serial"){
+    return `
+      <div class="grid grid-2">
+        <label>Port <input id="port_name" placeholder="/dev/ttyUSB0"></label>
+        <label>Baud <input id="baud" type="number" value="115200"></label>
+      </div>
+    `;
+  }
+  return "";
+}
+function setParams(){
+  const s = document.getElementById("scheme").value;
+  document.getElementById("params").innerHTML = schemeParamsUI(s);
+}
+document.getElementById("scheme").addEventListener("change", setParams);
+setParams();
+
+async function send(){
+  const packet_name = document.getElementById("packet_name").value;
+  const scheme = document.getElementById("scheme").value;
+  const params = {};
+  if(scheme==="UDP"||scheme==="TCP"){
+    params.host = document.getElementById("host").value || "127.0.0.1";
+    params.port = parseInt(document.getElementById("port").value||"9000",10);
+    if(scheme==="TCP"){
+      params.timeout = parseFloat(document.getElementById("timeout").value||"2.0");
+    }
+  }else if(scheme==="Serial"){
+    params.port = document.getElementById("port_name").value || "/dev/ttyUSB0";
+    params.baud = parseInt(document.getElementById("baud").value||"115200",10);
+  }
+  const resp = await fetch("/api/send",{method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({packet_name, scheme, params})});
+  const data = await resp.json();
+  document.getElementById("result").textContent = JSON.stringify(data,null,2);
+}
+document.getElementById("sendBtn").addEventListener("click", ()=>send().catch(e=>alert(e.message)));
+</script>

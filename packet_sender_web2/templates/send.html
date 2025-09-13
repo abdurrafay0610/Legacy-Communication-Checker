@@ -1,0 +1,89 @@
+
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Packet Sender — Send</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Send Packets</h1>
+      <nav>
+        <a href="{{ url_for('define_page') }}">Define</a>
+        <a href="{{ url_for('send_page') }}">Send</a>
+      </nav>
+    </header>
+
+    <section class="card">
+      <h2>Pick a Definition</h2>
+      <div class="grid">
+        <label>
+          Template
+          <select id="templateSelect">
+            <option value="">-- choose --</option>
+            {% for p in packets %}
+              <option value="{{ p.name }}">{{ p.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Overrides (optional)</h2>
+      <form id="sendForm" class="grid grid-2">
+        <label class="col-span-2">
+          Destination (host or IP)
+          <input id="destination" placeholder="leave blank to use template">
+        </label>
+        <label>
+          Protocol
+          <select id="protocol">
+            <option value="">(template)</option>
+            <option>UDP</option>
+            <option>TCP</option>
+          </select>
+        </label>
+        <label>
+          Port
+          <input id="port" type="number" min="0" max="65535" placeholder="(template)">
+        </label>
+        <label>
+          Timeout (ms)
+          <input id="timeout_ms" type="number" min="0" placeholder="(template)">
+        </label>
+        <label>
+          Retries
+          <input id="retries" type="number" min="0" placeholder="(template)">
+        </label>
+        <label class="col-span-2">
+          Payload
+          <textarea id="payload" rows="3" placeholder="(template)"></textarea>
+        </label>
+        <label class="col-span-2">
+          Headers (JSON)
+          <textarea id="headers" rows="3" placeholder="(template)"></textarea>
+        </label>
+        <label class="col-span-2">
+          Auth (JSON)
+          <textarea id="auth" rows="3" placeholder="(template)"></textarea>
+        </label>
+        <div class="col-span-2 right">
+          <button type="submit">Send</button>
+        </div>
+      </form>
+      <pre id="result" class="result"></pre>
+    </section>
+
+    <section class="card">
+      <h2>Activity Log</h2>
+      <button id="refreshLogs">Refresh</button>
+      <div id="logs" class="logs"></div>
+    </section>
+  </div>
+  <script src="{{ url_for('static', filename='send.js') }}"></script>
+</body>
+</html>

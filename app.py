@@ -51,6 +51,30 @@ while (True):
         packet.save_packet_definition(packet.define_packet(packet_name, values, packet.PACKET_VALIDATION_SCHEMES[pvs_choice]))
     # Sending a packet
     elif choice == 2:
+
+        # Communication Channel Setup should be like a configuration available on the sending packet page
+        print("Setup Communication Channel")
+        print("Select a Communication Channel")
+        print("1. UDP")
+        print("2. TCP")
+        print("3. Serial")
+        communication_choice = int(input(""))
+        if communication_choice == 1:
+            print("UDP Channel Selected")
+            # TODO :: Add IP validation
+            udp_local_ip = input("Kindly Enter your local UDP IP")
+            udp_local_port = input("Kindly Enter your local UDP port")
+            udp_remote_ip = input("Kindly Enter your remote UDP IP")
+            udp_remote_port = input("Kindly Enter your remote UDP port")
+        
+
+
+        print("")
+        print("Choose a sending style:")
+        print("1: Continuous Packet Sending")
+        print("2: Response to a packet")
+
+        print("")
         print("Choose a packet to send")
         counter = 0
         for ap in available_packets:
