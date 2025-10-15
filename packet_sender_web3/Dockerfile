@@ -16,15 +16,20 @@ RUN useradd -m -u 10001 appuser
 
 WORKDIR /app
 
-# Copy source
-# (If you later add requirements.txt, copy & pip install before copying source for better caching)
-COPY file_writter.py packet.py packet_authentication_functions.py app.py README.md ./
+# Copy app code
+COPY . .
+
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Ensure the runtime folder exists (name has a space)
 RUN mkdir -p "Packets Definition" && chown -R appuser:appuser /app
 
 # Drop privileges
 USER appuser
+
+# Expose the port your app runs on
+EXPOSE 7860
+ENV PORT=7860
 
 # Use Tini as PID 1 for proper signal handling in interactive mode
 ENTRYPOINT ["/usr/bin/tini", "--"]
