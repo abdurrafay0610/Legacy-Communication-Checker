@@ -1,55 +1,101 @@
 [
   {
-    "name": "Test",
-    "size": 5,
-    "validation_scheme": "CRC16",
+    "Packet Name": "Test",
+    "Packet Validation Scheme": "CRC16_LSB_MSB",
     "values": {
       "0": [
-        255
+        0
       ],
       "1": [
-        255,
-        255
+        0
       ],
       "2": [
-        255
+        0
       ],
       "3": [
-        255
+        0
       ],
       "4": [
+        0
+      ],
+      "5": [
+        0
+      ],
+      "6": [
+        0
+      ],
+      "7": [
+        0
+      ],
+      "8": [
+        0
+      ],
+      "9": [
         0
       ]
     }
   },
   {
-    "name": "Test 2",
-    "size": 1,
-    "validation_scheme": "CHECKSUM",
+    "Packet Name": "Test 2",
+    "Packet Validation Scheme": "CHECKSUM",
     "values": {
       "0": {
-        "name": "Test",
-        "size": 5,
-        "validation_scheme": "CRC16",
+        "Packet Name": "Test",
+        "Packet Validation Scheme": "CRC16_LSB_MSB",
         "values": {
           "0": [
-            255
+            0
           ],
           "1": [
-            255,
-            255
+            0
           ],
           "2": [
-            255
+            0
           ],
           "3": [
-            255
+            0
           ],
           "4": [
             0
+          ],
+          "5": [
+            0
+          ],
+          "6": [
+            0
+          ],
+          "7": [
+            0
+          ],
+          "8": [
+            0
+          ],
+          "9": [
+            0
           ]
         }
-      }
+      },
+      "1": [
+        0
+      ],
+      "2": [
+        0
+      ],
+      "3": [
+        0
+      ],
+      "4": [
+        0
+      ],
+      "5": [
+        0
+      ],
+      "6": [
+        0
+      ],
+      "7": [
+        0
+      ]
     }
   }
 ]
