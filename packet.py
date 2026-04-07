@@ -186,8 +186,9 @@ def load_all_packet_definitions():
 
 def create_packet(packet_definition):
     """
-    Function Description: This function will create a packet for us, using the 
-    packet definition provided as a parameter. 
+    Function Description: This function will create a valid packet for us, using the
+    packet definition provided as a parameter. The validation bytes (checksum / CRC)
+    are correctly calculated and appended.
     """
     assert packet_definition_health_check(packet_definition), "Packet failed definition health check"
 
@@ -225,6 +226,36 @@ def create_packet(packet_definition):
     # CRC32 MSB first (big-endian)
     elif packet_definition[PACKET_VALIDATION_SCHEME] == PACKET_VALIDATION_SCHEMES[5]:
         packet_authentication_functions.add_crc32_msb_lsb(packet)
+
+    return packet
+
+
+def corrupt_packet(packet):
+    """
+    Function Description: This function will corrupt a valid packet by flipping one
+    random bit in one randomly chosen byte in the data portion (not the trailing
+    validation bytes). This guarantees the checksum / CRC no longer matches,
+    producing a reliably invalid packet.
+
+    Trailing bytes avoided:
+        - 1 byte  for CHECKSUM / REVS_CHECKSUM
+        - 2 bytes for CRC16
+        - 4 bytes for CRC32
+    We conservatively avoid the last 4 bytes so the function works for all schemes.
+
+    :param packet: List of integers (0-255) — a fully built valid packet
+    :return: The same list, mutated in-place, with one data byte corrupted
+    """
+    assert type(packet) is list and len(packet) > 0, "packet must be a non-empty list"
+
+    # Avoid corrupting the trailing validation bytes (up to 4 for CRC32).
+    # If the packet is very short, corrupt the first byte as a fallback.
+    data_end = max(0, len(packet) - 4)
+    corrupt_index = random.randint(0, data_end)
+
+    # Flip a random bit in the chosen byte
+    bit = 1 << random.randint(0, 7)
+    packet[corrupt_index] ^= bit
 
     return packet
 
