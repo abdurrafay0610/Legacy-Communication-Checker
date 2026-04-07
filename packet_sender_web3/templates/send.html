@@ -14,12 +14,46 @@
     }
     .toggle-btn.active-valid   { background: #0f2e1a; color: #4cde87; border-color: #4cde87; }
     .toggle-btn.active-invalid { background: #2e0f0f; color: #ff6161; border-color: #ff6161; }
-    .badge {
-      display: inline-block; padding: 2px 10px; border-radius: 99px;
-      font-size: 12px; font-weight: 700; margin-left: 8px;
+
+    /* Corruption index selector */
+    .index-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .idx-chip {
+      display: flex; align-items: center; gap: 6px;
+      background: #0e141b; border: 1px solid var(--border);
+      border-radius: 8px; padding: 5px 10px; cursor: pointer;
+      font-size: 13px; transition: border-color 0.15s, background 0.15s;
+      user-select: none;
     }
-    .badge-valid   { background: #0f2e1a; color: #4cde87; }
-    .badge-invalid { background: #2e0f0f; color: #ff6161; }
+    .idx-chip.selected { background: #2e0f0f; border-color: #ff6161; color: #ff6161; }
+    .idx-chip .vals { color: var(--muted); font-size: 11px; }
+
+    /* Log panel */
+    .log-panel {
+      background: #0a0d11; border: 1px solid var(--border); border-radius: 12px;
+      padding: 10px 12px; max-height: 340px; overflow-y: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+    }
+    .log-entry { padding: 3px 0; border-bottom: 1px dashed #1a2535; }
+    .log-entry:last-child { border-bottom: none; }
+    .log-entry .ts  { color: var(--muted); margin-right: 8px; }
+    .log-entry.WARN  .tag { color: #ffaa33; }
+    .log-entry.ERROR .tag { color: #ff6161; }
+    .log-entry.INFO  .tag { color: #4da3ff; }
+
+    /* Session status bar */
+    .status-bar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 14px; border-radius: 10px; margin-bottom: 10px;
+      background: #0e141b; border: 1px solid var(--border); font-size: 13px;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+    .dot.running { background: #4cde87; box-shadow: 0 0 6px #4cde87; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    .btn-stop { background: #ff6161; color: #1a0000; }
+    .btn-stop:hover { filter: brightness(1.1); }
+
+    select, input[type=number], input[type=text] { font-size: 14px; }
   </style>
 </head>
 <body>
@@ -36,7 +70,7 @@
   <section class="card">
     <h2>1) Choose Packet</h2>
     <label>Packet
-      <select id="packet_name">
+      <select id="packet_name" onchange="onPacketChange()">
         <option value="">-- choose --</option>
         {% for p in packets %}
           <option value="{{ p[pkt_name_key] }}">{{ p[pkt_name_key] }}</option>
@@ -45,24 +79,74 @@
     </label>
   </section>
 
-  <!-- Step 2: valid or invalid -->
+  <!-- Step 2: valid or invalid + corruption selector -->
   <section class="card">
     <h2>2) Packet Validity</h2>
     <p style="color:var(--muted);font-size:13px;margin:0 0 10px">
       <strong>Valid</strong> — correct checksum / CRC appended. &nbsp;
-      <strong>Invalid</strong> — a random data byte is bit-flipped so validation fails on the receiver.
+      <strong>Invalid</strong> — select specific byte indices to corrupt.
     </p>
     <div class="toggle-row">
       <button class="toggle-btn active-valid" id="btnValid"   onclick="setValidity(true)">✓ Valid Packet</button>
       <button class="toggle-btn"              id="btnInvalid" onclick="setValidity(false)">✗ Invalid Packet</button>
     </div>
+
+    <div id="corruptSection" style="display:none; margin-top:14px">
+      <p style="font-size:13px;color:var(--muted);margin:0 0 8px">
+        Select byte indices to corrupt. Each selected byte will be forced to
+        <code>0xFF</code> (or <code>0x00</code> if its current value is already <code>0xFF</code>).
+      </p>
+
+      <!-- Chip list populated from /api/packet/indices -->
+      <div id="indexGrid" class="index-grid">
+        <span style="color:var(--muted);font-size:13px">Choose a packet first.</span>
+      </div>
+
+      <!-- Manual input -->
+      <div style="margin-top:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+        <label style="font-size:13px; display:flex; gap:6px; align-items:center">
+          Also type index:
+          <input id="manualIdx" type="number" min="0" style="width:80px; padding:6px 10px">
+        </label>
+        <button onclick="addManualIndex()" style="padding:7px 14px; font-size:13px">Add</button>
+        <button onclick="clearSelection()" style="padding:7px 14px; font-size:13px; background:#2e2e2e; color:var(--fg)">Clear All</button>
+      </div>
+
+      <p style="font-size:12px; color:var(--muted); margin:8px 0 0">
+        Selected indices: <span id="selectedLabel" style="color:#ff6161">none</span>
+      </p>
+    </div>
   </section>
 
-  <!-- Step 3: transport scheme -->
+  <!-- Step 3: ACK / response config -->
   <section class="card">
-    <h2>3) Sending Scheme</h2>
+    <h2>3) Expected Response (ACK)</h2>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 10px">
+      Configure whether you expect a response after each sent packet.
+      If a response is expected but not received within the timeout, it will be logged.
+    </p>
+    <div class="grid grid-2">
+      <label class="col-span-2">
+        Expected ACK packet
+        <select id="ack_packet_name">
+          <option value="">None (no response expected)</option>
+          {% for p in packets %}
+            <option value="{{ p[pkt_name_key] }}">{{ p[pkt_name_key] }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        ACK timeout (seconds)
+        <input id="ack_timeout" type="number" min="0.1" step="0.1" value="2.0">
+      </label>
+    </div>
+  </section>
+
+  <!-- Step 4: transport scheme -->
+  <section class="card">
+    <h2>4) Sending Scheme</h2>
     <label>Scheme
-      <select id="scheme" onchange="setParams()">
+      <select id="scheme" onchange="renderParams()">
         <option value="UDP">UDP</option>
         <option value="TCP">TCP</option>
         <option value="SERIAL">Serial</option>
@@ -70,16 +154,39 @@
     </label>
   </section>
 
-  <!-- Step 4: scheme parameters -->
+  <!-- Step 5: scheme parameters + interval -->
   <section class="card">
-    <h2>4) Parameters</h2>
+    <h2>5) Parameters</h2>
     <div id="params"></div>
+    <div style="margin-top:12px">
+      <label>
+        Send interval (ms)
+        <input id="interval_ms" type="number" min="50" value="1000">
+      </label>
+    </div>
   </section>
 
-  <!-- Send -->
+  <!-- Start / Stop -->
   <section class="card">
-    <button id="sendBtn">Send</button>
-    <pre id="result" class="result" style="margin-top:12px"></pre>
+    <div id="statusBar" class="status-bar" style="display:none">
+      <div class="dot running" id="statusDot"></div>
+      <span id="statusText">Running…</span>
+      <span style="color:var(--muted);font-size:12px" id="sessionIdLabel"></span>
+    </div>
+
+    <div style="display:flex; gap:10px">
+      <button id="startBtn" onclick="startSession()">▶ Start Sending</button>
+      <button id="stopBtn"  onclick="stopSession()" class="btn-stop" style="display:none">■ Stop</button>
+    </div>
+  </section>
+
+  <!-- Live log -->
+  <section class="card" id="logCard" style="display:none">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+      <h2 style="margin:0">Session Log</h2>
+      <span style="font-size:12px; color:var(--muted)" id="logCount"></span>
+    </div>
+    <div class="log-panel" id="logPanel"></div>
   </section>
 </div>
 
@@ -87,106 +194,273 @@
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
-let isValid = true;
+let isValid        = true;
+let flatIndices    = [];      // from /api/packet/indices
+let selectedSet    = new Set(); // flat_index values the user picked
+let sessionId      = null;
+let pollInterval   = null;
+let lastLogCount   = 0;
 
+// ---------------------------------------------------------------------------
+// Validity toggle
+// ---------------------------------------------------------------------------
 function setValidity(v) {
   isValid = v;
   document.getElementById("btnValid").className   = "toggle-btn" + (v  ? " active-valid"   : "");
   document.getElementById("btnInvalid").className = "toggle-btn" + (!v ? " active-invalid" : "");
+  document.getElementById("corruptSection").style.display = v ? "none" : "block";
+}
+
+// ---------------------------------------------------------------------------
+// Packet selection — fetch byte indices
+// ---------------------------------------------------------------------------
+async function onPacketChange() {
+  const name = document.getElementById("packet_name").value;
+  flatIndices = [];
+  selectedSet.clear();
+  updateSelectedLabel();
+
+  if (!name) {
+    document.getElementById("indexGrid").innerHTML =
+      '<span style="color:var(--muted);font-size:13px">Choose a packet first.</span>';
+    return;
+  }
+
+  try {
+    const resp = await fetch(`/api/packet/indices/${encodeURIComponent(name)}`);
+    const data = await resp.json();
+    if (!data.ok) throw new Error(data.error);
+    flatIndices = data.indices;
+    renderIndexGrid();
+  } catch (e) {
+    document.getElementById("indexGrid").innerHTML =
+      `<span style="color:#ff6161;font-size:13px">Failed to load indices: ${e.message}</span>`;
+  }
+}
+
+function renderIndexGrid() {
+  const grid = document.getElementById("indexGrid");
+  if (!flatIndices.length) {
+    grid.innerHTML = '<span style="color:var(--muted);font-size:13px">No byte indices found.</span>';
+    return;
+  }
+  grid.innerHTML = "";
+  flatIndices.forEach(entry => {
+    const chip = document.createElement("div");
+    chip.className = "idx-chip" + (selectedSet.has(entry.flat_index) ? " selected" : "");
+    chip.dataset.idx = entry.flat_index;
+
+    const valStr = entry.valid_values.length > 4
+      ? entry.valid_values.slice(0, 4).map(v => "0x" + v.toString(16).toUpperCase().padStart(2,"0")).join(", ") + "…"
+      : entry.valid_values.map(v => "0x" + v.toString(16).toUpperCase().padStart(2,"0")).join(", ");
+
+    chip.innerHTML =
+      `<span>Byte <strong>${entry.flat_index}</strong></span>` +
+      `<span class="vals">[${valStr}]</span>`;
+
+    chip.addEventListener("click", () => toggleChip(entry.flat_index, chip));
+    grid.appendChild(chip);
+  });
+}
+
+function toggleChip(idx, chip) {
+  if (selectedSet.has(idx)) {
+    selectedSet.delete(idx);
+    chip.classList.remove("selected");
+  } else {
+    selectedSet.add(idx);
+    chip.classList.add("selected");
+  }
+  updateSelectedLabel();
+}
+
+function addManualIndex() {
+  const val = parseInt(document.getElementById("manualIdx").value, 10);
+  if (isNaN(val) || val < 0) return;
+  selectedSet.add(val);
+  // If this index is in our chip list, highlight it
+  const chip = document.querySelector(`.idx-chip[data-idx="${val}"]`);
+  if (chip) chip.classList.add("selected");
+  updateSelectedLabel();
+}
+
+function clearSelection() {
+  selectedSet.clear();
+  document.querySelectorAll(".idx-chip.selected").forEach(c => c.classList.remove("selected"));
+  updateSelectedLabel();
+}
+
+function updateSelectedLabel() {
+  const el = document.getElementById("selectedLabel");
+  const sorted = [...selectedSet].sort((a, b) => a - b);
+  el.textContent = sorted.length ? sorted.join(", ") : "none";
 }
 
 // ---------------------------------------------------------------------------
 // Scheme parameter UI
 // ---------------------------------------------------------------------------
-function schemeParamsUI(s) {
-  if (s === "UDP") {
-    return `
-      <div class="grid grid-2">
-        <label>Host <input id="host" placeholder="127.0.0.1" value="127.0.0.1"></label>
-        <label>Port <input id="port" type="number" min="1" max="65535" value="9000"></label>
-      </div>`;
-  }
-  if (s === "TCP") {
-    return `
-      <div class="grid grid-2">
-        <label>Host    <input id="host"    placeholder="127.0.0.1" value="127.0.0.1"></label>
-        <label>Port    <input id="port"    type="number" min="1" max="65535" value="9000"></label>
-        <label>Timeout (s) <input id="timeout" type="number" min="0" step="0.1" value="2.0"></label>
-      </div>`;
-  }
-  if (s === "SERIAL") {
-    return `
-      <div class="grid grid-2">
-        <label>Port <input id="port_name" placeholder="/dev/ttyUSB0" value="/dev/ttyUSB0"></label>
-        <label>Baud <input id="baud" type="number" value="115200"></label>
-      </div>`;
-  }
-  return "";
-}
-
-function setParams() {
+function renderParams() {
   const s = document.getElementById("scheme").value;
-  document.getElementById("params").innerHTML = schemeParamsUI(s);
+  let html = "";
+  if (s === "UDP") {
+    html = `<div class="grid grid-2">
+      <label>Host <input id="host" value="127.0.0.1"></label>
+      <label>Port <input id="port" type="number" min="1" max="65535" value="9000"></label>
+    </div>`;
+  } else if (s === "TCP") {
+    html = `<div class="grid grid-2">
+      <label>Host    <input id="host"    value="127.0.0.1"></label>
+      <label>Port    <input id="port"    type="number" min="1" max="65535" value="9000"></label>
+      <label>Connect timeout (s) <input id="tcp_timeout" type="number" min="0" step="0.1" value="5.0"></label>
+    </div>`;
+  } else if (s === "SERIAL") {
+    html = `<div class="grid grid-2">
+      <label>Port name <input id="port_name" value="/dev/ttyUSB0"></label>
+      <label>Baud      <input id="baud" type="number" value="115200"></label>
+    </div>`;
+  }
+  document.getElementById("params").innerHTML = html;
 }
-setParams();
+renderParams();
 
-// ---------------------------------------------------------------------------
-// Collect params
-// ---------------------------------------------------------------------------
 function collectParams(scheme) {
-  if (scheme === "UDP") {
-    return {
-      host: document.getElementById("host").value || "127.0.0.1",
-      port: parseInt(document.getElementById("port").value || "9000", 10),
-    };
-  }
-  if (scheme === "TCP") {
-    return {
-      host:    document.getElementById("host").value    || "127.0.0.1",
-      port:    parseInt(document.getElementById("port").value    || "9000", 10),
-      timeout: parseFloat(document.getElementById("timeout").value || "2.0"),
-    };
-  }
-  if (scheme === "SERIAL") {
-    return {
-      port_name: document.getElementById("port_name").value || "/dev/ttyUSB0",
-      baud:      parseInt(document.getElementById("baud").value || "115200", 10),
-    };
-  }
+  if (scheme === "UDP") return {
+    host: document.getElementById("host").value || "127.0.0.1",
+    port: parseInt(document.getElementById("port").value || "9000", 10),
+  };
+  if (scheme === "TCP") return {
+    host: document.getElementById("host").value || "127.0.0.1",
+    port: parseInt(document.getElementById("port").value || "9000", 10),
+  };
+  if (scheme === "SERIAL") return {
+    port_name: document.getElementById("port_name").value || "/dev/ttyUSB0",
+    baud:      parseInt(document.getElementById("baud").value || "115200", 10),
+  };
   return {};
 }
 
 // ---------------------------------------------------------------------------
-// Send
+// Session start / stop
 // ---------------------------------------------------------------------------
-async function send() {
+async function startSession() {
   const packet_name = document.getElementById("packet_name").value;
   if (!packet_name) { alert("Please choose a packet first."); return; }
 
-  const scheme = document.getElementById("scheme").value;
-  const params = collectParams(scheme);
+  const scheme          = document.getElementById("scheme").value;
+  const params          = collectParams(scheme);
+  const interval_ms     = parseInt(document.getElementById("interval_ms").value || "1000", 10);
+  const ack_packet_name = document.getElementById("ack_packet_name").value || null;
+  const ack_timeout     = parseFloat(document.getElementById("ack_timeout").value || "2.0");
+  const corrupt_indices = isValid ? [] : [...selectedSet].sort((a, b) => a - b);
 
-  const body = { packet_name, scheme, valid: isValid, params };
+  const body = { packet_name, scheme, params, interval_ms, corrupt_indices, ack_packet_name, ack_timeout };
 
-  document.getElementById("result").textContent = "Sending…";
+  try {
+    const resp = await fetch("/api/session/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json();
+    if (!data.ok) throw new Error(data.error);
 
-  const resp = await fetch("/api/send", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = await resp.json();
-
-  // Pretty-print with a validity badge in the raw JSON area
-  let display = JSON.stringify(data, null, 2);
-  document.getElementById("result").textContent = display;
+    sessionId    = data.session_id;
+    lastLogCount = 0;
+    setRunning(true);
+    startPolling();
+  } catch (e) {
+    alert("Failed to start session: " + e.message);
+  }
 }
 
-document.getElementById("sendBtn").addEventListener("click", () =>
-  send().catch(e => {
-    document.getElementById("result").textContent = JSON.stringify({ ok: false, error: e.message }, null, 2);
-  })
-);
+async function stopSession() {
+  if (!sessionId) return;
+  await fetch("/api/session/stop", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+  setRunning(false);
+  stopPolling();
+}
+
+// ---------------------------------------------------------------------------
+// UI state
+// ---------------------------------------------------------------------------
+function setRunning(running) {
+  document.getElementById("startBtn").style.display  = running ? "none"  : "inline-block";
+  document.getElementById("stopBtn").style.display   = running ? "inline-block" : "none";
+  document.getElementById("statusBar").style.display = running ? "flex"  : "none";
+  document.getElementById("logCard").style.display   = (running || sessionId) ? "block" : "none";
+  if (running) {
+    document.getElementById("statusText").textContent  = "Running…";
+    document.getElementById("sessionIdLabel").textContent = "session: " + sessionId;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Log polling
+// ---------------------------------------------------------------------------
+function startPolling() {
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(pollLogs, 800);
+}
+
+function stopPolling() {
+  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+  // Final poll to get the "stopped" log entry
+  pollLogs();
+}
+
+async function pollLogs() {
+  if (!sessionId) return;
+  try {
+    const resp = await fetch(`/api/session/logs/${sessionId}`);
+    const data = await resp.json();
+    if (!data.ok) return;
+
+    renderLogs(data.log);
+
+    if (data.stopped) {
+      setRunning(false);
+      stopPolling();
+      document.getElementById("statusText").textContent = "Stopped.";
+      document.getElementById("statusBar").style.display = "flex";
+      document.getElementById("statusDot").className = "dot";
+    }
+  } catch (_) {}
+}
+
+function renderLogs(entries) {
+  const panel = document.getElementById("logPanel");
+  document.getElementById("logCount").textContent = `${entries.length} entries`;
+
+  // Only append new entries to avoid full re-render flicker
+  const newEntries = entries.slice(lastLogCount);
+  lastLogCount = entries.length;
+
+  newEntries.forEach(e => {
+    const div = document.createElement("div");
+    div.className = `log-entry ${e.level}`;
+
+    const tsStr = e.ts.replace("T", " ").replace("Z", "");
+    const tagMap = { INFO: "INFO", WARN: "WARN", ERROR: "ERR" };
+
+    div.innerHTML =
+      `<span class="ts">${tsStr}</span>` +
+      `<span class="tag">[${tagMap[e.level] || e.level}]</span> ` +
+      escapeHtml(e.msg);
+
+    panel.appendChild(div);
+  });
+
+  // Auto-scroll to bottom
+  panel.scrollTop = panel.scrollHeight;
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
 </script>
 </body>
 </html>

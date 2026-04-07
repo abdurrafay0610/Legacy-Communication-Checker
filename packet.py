@@ -42,8 +42,6 @@ def packet_definition_health_check(packet_definition):
                         values = packet_definition[VALUES]
                         # Packet should have its values in a dict format
                         if type(values) == dict:
-                            # Values are of the form { index : mapping }
-                            # Where index corresponds to the packets index placement and the value is the potential value of that index
                             for v in values:
                                 if (type(values[v]) != list) and (type(values[v]) != dict):
                                     print("packet_definition is:")
@@ -93,7 +91,7 @@ def packet_definition_health_check(packet_definition):
 
 def define_packet(name, values, packet_validation_scheme):
     """
-    Function Description: We will define a packet using this function. We will further 
+    Function Description: We will define a packet using this function. We will further
     use this function definition to create different variations of this packet
 
     A packet should have:
@@ -130,12 +128,8 @@ def save_packet_definition(packet):
 
     assert type(packet) is dict, "packet must be a dictionary!"
 
-    # In case our packet directory has not been created yet
-    # If it is already present, the below line will do nothing
     file_writter.create_folder(JSON_FILE_DIRECTORY)
-    # Providing the file path, where to save the packet
     file_path = JSON_FILE_DIRECTORY + "/" + packet[PACKET_NAME] + ".json"
-    # The function that actually writes the packet into the file
     flag = file_writter.write_json_file(file_path, packet)
 
     assert flag == True, "Debug why packet writing to file failed! This is an unexpected issue! Add more checks accordingly."
@@ -161,21 +155,16 @@ def load_packet_definition(file_path):
 
 def load_all_packet_definitions():
     """
-    Function Description: This function will load all the available packet definitions 
+    Function Description: This function will load all the available packet definitions
     in the JSON_FILE_DIRECTORY. It will return them as a list
     """
 
-    # In case our packet directory has not been created yet
-    # If it is already present, the below line will do nothing
     file_writter.create_folder(JSON_FILE_DIRECTORY)
-    # It will get all the files (json or not) from the JSON_FILE_DIRECTORY
     all_files = file_writter.get_all_files(JSON_FILE_DIRECTORY)
 
-    # We will store our packets definition in this list
     packets_definitions = []
 
     for af in all_files:
-        # Only loading files that are of type json
         if file_writter.get_file_extension(af) == ".json":
             loaded_packet = load_packet_definition(af)
             if loaded_packet != None:
@@ -230,32 +219,67 @@ def create_packet(packet_definition):
     return packet
 
 
-def corrupt_packet(packet):
+def get_flat_byte_indices(packet_definition):
     """
-    Function Description: This function will corrupt a valid packet by flipping one
-    random bit in one randomly chosen byte in the data portion (not the trailing
-    validation bytes). This guarantees the checksum / CRC no longer matches,
-    producing a reliably invalid packet.
+    Function Description: Resolves a packet definition into a flat ordered list of
+    byte index descriptors. Each entry describes one byte in the final built packet:
+        {
+            "flat_index": int,       # position in the final byte array
+            "valid_values": list,    # the list of valid values at this position
+                                     # (None means full range 0-255 was implied by a sub-packet)
+        }
 
-    Trailing bytes avoided:
-        - 1 byte  for CHECKSUM / REVS_CHECKSUM
-        - 2 bytes for CRC16
-        - 4 bytes for CRC32
-    We conservatively avoid the last 4 bytes so the function works for all schemes.
+    This is used by the UI to let the user select which specific bytes to corrupt.
+    """
+    result = []
+    _collect_flat_indices(packet_definition, result)
+    return result
 
-    :param packet: List of integers (0-255) — a fully built valid packet
-    :return: The same list, mutated in-place, with one data byte corrupted
+
+def _collect_flat_indices(packet_definition, result):
+    """
+    Helper: recursively walks a packet definition and appends one entry per
+    byte (in order) into `result`.
+    """
+    value_dict = packet_definition[VALUES]
+
+    for key in value_dict:
+        v = value_dict[key]
+        if type(v) == list:
+            flat_index = len(result)
+            result.append({
+                "flat_index":   flat_index,
+                "valid_values": v,
+            })
+        elif type(v) == dict:
+            # Recursively expand the sub-packet bytes
+            _collect_flat_indices(v, result)
+
+
+def corrupt_packet_at_indices(packet, corrupt_indices):
+    """
+    Function Description: Corrupts specific bytes in a built packet.
+
+    For each index in corrupt_indices:
+      - If the byte's current value is 0xFF  → set it to 0x00
+      - Otherwise                            → set it to 0xFF
+
+    This gives a deterministic, visible corruption at exactly the positions
+    the user has chosen, which is easy to verify on the receiving side.
+
+    :param packet:          List of integers (0-255) — a fully built valid packet
+    :param corrupt_indices: List of int indices into `packet` to corrupt
+    :return: The same list, mutated in-place
     """
     assert type(packet) is list and len(packet) > 0, "packet must be a non-empty list"
 
-    # Avoid corrupting the trailing validation bytes (up to 4 for CRC32).
-    # If the packet is very short, corrupt the first byte as a fallback.
-    data_end = max(0, len(packet) - 4)
-    corrupt_index = random.randint(0, data_end)
-
-    # Flip a random bit in the chosen byte
-    bit = 1 << random.randint(0, 7)
-    packet[corrupt_index] ^= bit
+    for idx in corrupt_indices:
+        if idx < 0 or idx >= len(packet):
+            continue  # silently skip out-of-range indices
+        if packet[idx] == 0xFF:
+            packet[idx] = 0x00
+        else:
+            packet[idx] = 0xFF
 
     return packet
 
@@ -263,13 +287,6 @@ def corrupt_packet(packet):
 def get_packet_values(packet):
     """
     Function Description: This function will get the values of a packet for us.
-
-    A packet value can be:
-        1) A list of possible byte value
-            1a) This can be the whole byte range [0-255], denoted by 'X'
-            1b) This can be a specific list as mentioned by the user
-        2) Another packet (dict)
-
     """
     packet_values = packet[VALUES]
     assert type(packet_values) is dict, "packet_values must be in a dictionary!"
